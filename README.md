@@ -25,4 +25,4 @@ Name    | Description                                                           
 --------|---------------------------------------------------------------------------------------------|----------------------
 port    | Bareos exporter port                                                                        | 9625
 endpoint| Bareos exporter endpoint.                                                                   | "/metrics"
-dsn     | Data source name of the database that is used by bareos. Protocol can be `mysql://` or `postgresql://`. The rest of the string is passed to the database driver. | "mysql://bareos@unix()/bareos?parseTime=true"
+dsn     | Data source name of the database that is used by bareos. Protocol can be `mysql://` or `postgres://`. The rest of the string is passed to the database driver. | "mysql://bareos@unix()/bareos?parseTime=true" <br> "postgres://dbname=bareos sslmode=disable user=bareos password=bareos" <br> "postgres://host=/var/run/postgresql dbname=bareos"
