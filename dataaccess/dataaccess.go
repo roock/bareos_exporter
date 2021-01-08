@@ -23,6 +23,7 @@ type sqlQueries struct {
 	LastJobStatus string
 	LastFullJob   string
 	ScheduledJobs string
+	PoolInfo      string
 }
 
 var mysqlQueries *sqlQueries = &sqlQueries{
@@ -33,6 +34,7 @@ var mysqlQueries *sqlQueries = &sqlQueries{
 	LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
 	LastFullJob:   "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM Job WHERE Name = ? AND Level = 'F' AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
+	PoolInfo:      "SELECT p.name, sum(m.volbytes) as bytes, COUNT(m) as volumes, 0 as prunable FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name",
 }
 
 var postgresQueries *sqlQueries = &sqlQueries{
@@ -43,6 +45,7 @@ var postgresQueries *sqlQueries = &sqlQueries{
 	LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
 	LastFullJob:   "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM job WHERE Name = $1 AND Level = 'F' AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
+	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable",
 }
 
 // GetConnection opens a new db connection
@@ -205,6 +208,29 @@ func (connection Connection) ScheduledJobs(server string) (*types.ScheduledJob, 
 	}
 
 	return &schedJob, err
+}
+
+func (connection Connection) PoolInfo() ([]types.PoolInfo, error) {
+	results, err := connection.execQuery(connection.queries.PoolInfo)
+	defer results.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var poolInfoList []types.PoolInfo
+
+	for results.Next() {
+		var poolInfo types.PoolInfo
+		err = results.Scan(&poolInfo.Name, &poolInfo.Bytes, &poolInfo.Volumes, &poolInfo.Prunable)
+		if err != nil {
+			return nil, err
+		}
+		poolInfoList = append(poolInfoList, poolInfo)
+	}
+
+	return poolInfoList, nil
+
 }
 
 // Close the database connection

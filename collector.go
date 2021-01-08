@@ -5,6 +5,7 @@ import (
 	"github.com/vierbergenlars/bareos_exporter/dataaccess"
 
 	log "github.com/sirupsen/logrus"
+	"strconv"
 )
 
 type bareosMetrics struct {
@@ -22,6 +23,9 @@ type bareosMetrics struct {
 	LastFullJobTimestamp *prometheus.Desc
 
 	ScheduledJob *prometheus.Desc
+
+	PoolBytes   *prometheus.Desc
+	PoolVolumes *prometheus.Desc
 
 	connection *dataaccess.Connection
 }
@@ -76,6 +80,14 @@ func bareosCollector(conn *dataaccess.Connection) *bareosMetrics {
 			"Probable execution timestamp of next backup for hostname",
 			[]string{"hostname"}, nil,
 		),
+		PoolBytes: prometheus.NewDesc("bareos_pool_bytes",
+			"Total bytes saved in a pool",
+			[]string{"pool", "prunable"}, nil,
+		),
+		PoolVolumes: prometheus.NewDesc("bareos_pool_volumes",
+			"Total volumes in a pool",
+			[]string{"pool", "prunable"}, nil,
+		),
 		connection: conn,
 	}
 }
@@ -93,6 +105,8 @@ func (collector *bareosMetrics) Describe(ch chan<- *prometheus.Desc) {
 	ch <- collector.LastFullJobErrors
 	ch <- collector.LastFullJobTimestamp
 	ch <- collector.ScheduledJob
+	ch <- collector.PoolBytes
+	ch <- collector.PoolVolumes
 }
 
 var bareosTerminationStates = []string{
@@ -107,83 +121,97 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 		log.WithFields(log.Fields{
 			"method": "GetServerList",
 		}).Error(getServerListErr)
-		return
-	}
+	} else {
 
-	for _, server := range servers {
-		serverFiles, filesErr := collector.connection.TotalFiles(server)
-		serverBytes, bytesErr := collector.connection.TotalBytes(server)
-		lastServerJob, jobErr := collector.connection.LastJob(server)
-		lastFullServerJob, fullJobErr := collector.connection.LastFullJob(server)
-		scheduledJob, scheduledJobErr := collector.connection.ScheduledJobs(server)
-		lastJobStatus, lastJobStatusErr := collector.connection.LastJobStatus(server)
+		for _, server := range servers {
+			serverFiles, filesErr := collector.connection.TotalFiles(server)
+			serverBytes, bytesErr := collector.connection.TotalBytes(server)
+			lastServerJob, jobErr := collector.connection.LastJob(server)
+			lastFullServerJob, fullJobErr := collector.connection.LastFullJob(server)
+			scheduledJob, scheduledJobErr := collector.connection.ScheduledJobs(server)
+			lastJobStatus, lastJobStatusErr := collector.connection.LastJobStatus(server)
 
-		if filesErr != nil || bytesErr != nil || jobErr != nil || fullJobErr != nil || scheduledJobErr != nil || lastJobStatusErr != nil {
-			log.Info(server)
-		}
-
-		if filesErr != nil {
-			log.WithFields(log.Fields{
-				"method": "TotalFiles",
-			}).Error(filesErr)
-		}
-
-		if bytesErr != nil {
-			log.WithFields(log.Fields{
-				"method": "TotalBytes",
-			}).Error(bytesErr)
-		}
-
-		if jobErr != nil {
-			log.WithFields(log.Fields{
-				"method": "LastJob",
-			}).Error(jobErr)
-		}
-
-		if fullJobErr != nil {
-			log.WithFields(log.Fields{
-				"method": "LastFullJob",
-			}).Error(fullJobErr)
-		}
-
-		if scheduledJobErr != nil {
-			log.WithFields(log.Fields{
-				"method": "ScheduledJobs",
-			}).Error(scheduledJobErr)
-		}
-
-		if lastJobStatus != nil {
-
-			log.WithFields(log.Fields{
-				"method": "LastJobStatus",
-			}).Error(lastJobStatusErr)
-		}
-
-		ch <- prometheus.MustNewConstMetric(collector.TotalFiles, prometheus.CounterValue, float64(serverFiles.Files), server)
-		ch <- prometheus.MustNewConstMetric(collector.TotalBytes, prometheus.CounterValue, float64(serverBytes.Bytes), server)
-
-		ch <- prometheus.MustNewConstMetric(collector.LastJobBytes, prometheus.CounterValue, float64(lastServerJob.JobBytes), server, lastServerJob.Level)
-		ch <- prometheus.MustNewConstMetric(collector.LastJobFiles, prometheus.CounterValue, float64(lastServerJob.JobFiles), server, lastServerJob.Level)
-		ch <- prometheus.MustNewConstMetric(collector.LastJobErrors, prometheus.CounterValue, float64(lastServerJob.JobErrors), server, lastServerJob.Level)
-		ch <- prometheus.MustNewConstMetric(collector.LastJobTimestamp, prometheus.CounterValue, float64(lastServerJob.JobDate.Unix()), server, lastServerJob.Level)
-		for _, terminationState := range bareosTerminationStates {
-			var state = float64(0)
-			if lastJobStatus != nil {
-				if terminationState == *lastJobStatus {
-					state = 1
-				}
+			if filesErr != nil || bytesErr != nil || jobErr != nil || fullJobErr != nil || scheduledJobErr != nil || lastJobStatusErr != nil {
+				log.Info(server)
 			}
 
-			ch <- prometheus.MustNewConstMetric(collector.LastJobStatus, prometheus.CounterValue, state, server, terminationState)
+			if filesErr != nil {
+				log.WithFields(log.Fields{
+					"method": "TotalFiles",
+				}).Error(filesErr)
+			}
+
+			if bytesErr != nil {
+				log.WithFields(log.Fields{
+					"method": "TotalBytes",
+				}).Error(bytesErr)
+			}
+
+			if jobErr != nil {
+				log.WithFields(log.Fields{
+					"method": "LastJob",
+				}).Error(jobErr)
+			}
+
+			if fullJobErr != nil {
+				log.WithFields(log.Fields{
+					"method": "LastFullJob",
+				}).Error(fullJobErr)
+			}
+
+			if scheduledJobErr != nil {
+				log.WithFields(log.Fields{
+					"method": "ScheduledJobs",
+				}).Error(scheduledJobErr)
+			}
+
+			if lastJobStatus != nil {
+
+				log.WithFields(log.Fields{
+					"method": "LastJobStatus",
+				}).Error(lastJobStatusErr)
+			}
+
+			ch <- prometheus.MustNewConstMetric(collector.TotalFiles, prometheus.CounterValue, float64(serverFiles.Files), server)
+			ch <- prometheus.MustNewConstMetric(collector.TotalBytes, prometheus.CounterValue, float64(serverBytes.Bytes), server)
+
+			ch <- prometheus.MustNewConstMetric(collector.LastJobBytes, prometheus.CounterValue, float64(lastServerJob.JobBytes), server, lastServerJob.Level)
+			ch <- prometheus.MustNewConstMetric(collector.LastJobFiles, prometheus.CounterValue, float64(lastServerJob.JobFiles), server, lastServerJob.Level)
+			ch <- prometheus.MustNewConstMetric(collector.LastJobErrors, prometheus.CounterValue, float64(lastServerJob.JobErrors), server, lastServerJob.Level)
+			ch <- prometheus.MustNewConstMetric(collector.LastJobTimestamp, prometheus.CounterValue, float64(lastServerJob.JobDate.Unix()), server, lastServerJob.Level)
+			for _, terminationState := range bareosTerminationStates {
+				var state = float64(0)
+				if lastJobStatus != nil {
+					if terminationState == *lastJobStatus {
+						state = 1
+					}
+				}
+
+				ch <- prometheus.MustNewConstMetric(collector.LastJobStatus, prometheus.CounterValue, state, server, terminationState)
+
+			}
+
+			ch <- prometheus.MustNewConstMetric(collector.LastFullJobBytes, prometheus.CounterValue, float64(lastFullServerJob.JobBytes), server)
+			ch <- prometheus.MustNewConstMetric(collector.LastFullJobFiles, prometheus.CounterValue, float64(lastFullServerJob.JobFiles), server)
+			ch <- prometheus.MustNewConstMetric(collector.LastFullJobErrors, prometheus.CounterValue, float64(lastFullServerJob.JobErrors), server)
+			ch <- prometheus.MustNewConstMetric(collector.LastFullJobTimestamp, prometheus.CounterValue, float64(lastFullServerJob.JobDate.Unix()), server)
+
+			ch <- prometheus.MustNewConstMetric(collector.ScheduledJob, prometheus.CounterValue, float64(scheduledJob.ScheduledJobs), server)
 
 		}
+	}
 
-		ch <- prometheus.MustNewConstMetric(collector.LastFullJobBytes, prometheus.CounterValue, float64(lastFullServerJob.JobBytes), server)
-		ch <- prometheus.MustNewConstMetric(collector.LastFullJobFiles, prometheus.CounterValue, float64(lastFullServerJob.JobFiles), server)
-		ch <- prometheus.MustNewConstMetric(collector.LastFullJobErrors, prometheus.CounterValue, float64(lastFullServerJob.JobErrors), server)
-		ch <- prometheus.MustNewConstMetric(collector.LastFullJobTimestamp, prometheus.CounterValue, float64(lastFullServerJob.JobDate.Unix()), server)
+	var poolInfoList, poolInfoErr = collector.connection.PoolInfo()
 
-		ch <- prometheus.MustNewConstMetric(collector.ScheduledJob, prometheus.CounterValue, float64(scheduledJob.ScheduledJobs), server)
+	if poolInfoErr != nil {
+		log.WithFields(log.Fields{
+			"method": "PoolInfo",
+		}).Error(poolInfoErr)
+	} else {
 
+		for _, poolInfo := range poolInfoList {
+			ch <- prometheus.MustNewConstMetric(collector.PoolBytes, prometheus.CounterValue, float64(poolInfo.Bytes), poolInfo.Name, strconv.FormatBool(poolInfo.Prunable))
+			ch <- prometheus.MustNewConstMetric(collector.PoolVolumes, prometheus.CounterValue, float64(poolInfo.Volumes), poolInfo.Name, strconv.FormatBool(poolInfo.Prunable))
+		}
 	}
 }
