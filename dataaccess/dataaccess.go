@@ -220,17 +220,55 @@ func (connection Connection) PoolInfo() ([]types.PoolInfo, error) {
 
 	var poolInfoList []types.PoolInfo
 
+	var withPrunable []string
+	var withoutPrunable []string
+
 	for results.Next() {
 		var poolInfo types.PoolInfo
 		err = results.Scan(&poolInfo.Name, &poolInfo.Bytes, &poolInfo.Volumes, &poolInfo.Prunable)
 		if err != nil {
 			return nil, err
 		}
+		if poolInfo.Prunable {
+			withPrunable = append(withPrunable, poolInfo.Name)
+		} else {
+			withoutPrunable = append(withoutPrunable, poolInfo.Name)
+		}
+
 		poolInfoList = append(poolInfoList, poolInfo)
+	}
+
+	for _, poolInfo := range poolInfoList {
+		if !hasItem(withPrunable, poolInfo.Name) {
+			poolInfoList = append(poolInfoList, types.PoolInfo{
+				Name:     poolInfo.Name,
+				Prunable: true,
+				Volumes:  0,
+				Bytes:    0,
+			})
+		}
+
+		if !hasItem(withoutPrunable, poolInfo.Name) {
+			poolInfoList = append(poolInfoList, types.PoolInfo{
+				Name:     poolInfo.Name,
+				Prunable: false,
+				Volumes:  0,
+				Bytes:    0,
+			})
+		}
 	}
 
 	return poolInfoList, nil
 
+}
+
+func hasItem(lst []string, itm string) bool {
+	for _, i := range lst {
+		if i == itm {
+			return true
+		}
+	}
+	return false
 }
 
 // Close the database connection
