@@ -16,9 +16,8 @@ docker run --name bareos_exporter -p 9625:9625 -d vierbergenlars/bareos_exporter
 
 - Total amount of bytes and files saved
 - Latest executed job metrics (level, errors, execution time, bytes and files saved)
-- Latest full job (level = F) metrics
 - Amount of scheduled jobs
-- Amount of bytes and volumes in pools
+- Amount of bytes and volumes in pools (split by purgeable and expired)
 
 ### Flags
 
