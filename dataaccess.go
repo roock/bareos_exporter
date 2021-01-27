@@ -25,35 +25,32 @@ type sqlQueries struct {
 	PoolInfo      string
 }
 
-var mysqlQueries *sqlQueries = &sqlQueries{
-	ServerList:    "SELECT DISTINCT Name FROM Job WHERE SchedTime >= ?",
-	TotalBytes:    "SELECT SUM(JobBytes) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-	TotalFiles:    "SELECT SUM(JobFiles) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-	LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-	LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
-	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
-	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
-}
-
-var postgresQueries *sqlQueries = &sqlQueries{
-	ServerList:    "SELECT DISTINCT Name FROM job WHERE SchedTime >= $1",
-	TotalBytes:    "SELECT SUM(JobBytes) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-	TotalFiles:    "SELECT SUM(JobFiles) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-	LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-	LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
-	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
-	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+var queries map[string]*sqlQueries = map[string]*sqlQueries{
+	"mysql": &sqlQueries{
+		ServerList:    "SELECT DISTINCT Name FROM Job WHERE SchedTime >= ?",
+		TotalBytes:    "SELECT SUM(JobBytes) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
+		TotalFiles:    "SELECT SUM(JobFiles) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
+		LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
+		ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
+		PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+	},
+	"postgres": &sqlQueries{
+		ServerList:    "SELECT DISTINCT Name FROM job WHERE SchedTime >= $1",
+		TotalBytes:    "SELECT SUM(JobBytes) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
+		TotalFiles:    "SELECT SUM(JobFiles) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
+		LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
+		ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
+		PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+	},
 }
 
 // GetConnection opens a new db connection
 func GetConnection(databaseType string, connectionString string) (*Connection, error) {
-	var queries *sqlQueries
-	switch databaseType {
-	case "mysql":
-		queries = mysqlQueries
-	case "postgres":
-		queries = postgresQueries
-	default:
+	selectedQueries := queries[databaseType]
+
+	if selectedQueries == nil {
 		return nil, fmt.Errorf("Unknown database type %s", databaseType)
 	}
 
@@ -65,7 +62,7 @@ func GetConnection(databaseType string, connectionString string) (*Connection, e
 
 	return &Connection{
 		db:      db,
-		queries: queries,
+		queries: selectedQueries,
 	}, nil
 }
 
