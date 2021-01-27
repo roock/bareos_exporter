@@ -13,7 +13,8 @@ type bareosMetrics struct {
 	LastJobBytes     *prometheus.Desc
 	LastJobFiles     *prometheus.Desc
 	LastJobErrors    *prometheus.Desc
-	LastJobTimestamp *prometheus.Desc
+	LastJobStartTimestamp *prometheus.Desc
+	LastJobEndTimestamp *prometheus.Desc
 	LastJobStatus    *prometheus.Desc
 
 	LastFullJobBytes     *prometheus.Desc
@@ -51,29 +52,17 @@ func bareosCollector(conn *Connection) *bareosMetrics {
 			"Total errors occurred during last backup for hostname",
 			[]string{"hostname", "level"}, nil,
 		),
-		LastJobTimestamp: prometheus.NewDesc("bareos_last_backup_job_unix_timestamp",
-			"Execution timestamp of last backup for hostname",
+		LastJobStartTimestamp: prometheus.NewDesc("bareos_last_backup_job_unix_timestamp",
+			"Execution start timestamp of last backup for hostname",
+			[]string{"hostname", "level"}, nil,
+		),
+		LastJobEndTimestamp: prometheus.NewDesc("bareos_last_backup_job_end_unix_timestamp",
+			"Execution end timestamp of last backup for hostname",
 			[]string{"hostname", "level"}, nil,
 		),
 		LastJobStatus: prometheus.NewDesc("bareos_last_backup_job_status",
 			"Termination status of the last backup for hostname",
 			[]string{"hostname", "status"}, nil,
-		),
-		LastFullJobBytes: prometheus.NewDesc("bareos_last_full_backup_job_bytes_saved_total",
-			"Total bytes saved during last full backup (Level = F) for hostname",
-			[]string{"hostname"}, nil,
-		),
-		LastFullJobFiles: prometheus.NewDesc("bareos_last_full_backup_job_files_saved_total",
-			"Total files saved during last full backup (Level = F) for hostname",
-			[]string{"hostname"}, nil,
-		),
-		LastFullJobErrors: prometheus.NewDesc("bareos_last_full_backup_job_errors_occurred_while_saving_total",
-			"Total errors occurred during last full backup (Level = F) for hostname",
-			[]string{"hostname"}, nil,
-		),
-		LastFullJobTimestamp: prometheus.NewDesc("bareos_last_full_backup_job_unix_timestamp",
-			"Execution timestamp of last full backup (Level = F) for hostname",
-			[]string{"hostname"}, nil,
 		),
 		ScheduledJob: prometheus.NewDesc("bareos_scheduled_jobs_total",
 			"Probable execution timestamp of next backup for hostname",
@@ -97,12 +86,9 @@ func (collector *bareosMetrics) Describe(ch chan<- *prometheus.Desc) {
 	ch <- collector.LastJobBytes
 	ch <- collector.LastJobFiles
 	ch <- collector.LastJobErrors
-	ch <- collector.LastJobTimestamp
+	ch <- collector.LastJobStartTimestamp
+	ch <- collector.LastJobEndTimestamp
 	ch <- collector.LastJobStatus
-	ch <- collector.LastFullJobBytes
-	ch <- collector.LastFullJobFiles
-	ch <- collector.LastFullJobErrors
-	ch <- collector.LastFullJobTimestamp
 	ch <- collector.ScheduledJob
 	ch <- collector.PoolBytes
 	ch <- collector.PoolVolumes
@@ -126,11 +112,10 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 			serverFiles, filesErr := collector.connection.TotalFiles(server)
 			serverBytes, bytesErr := collector.connection.TotalBytes(server)
 			lastServerJob, jobErr := collector.connection.LastJob(server)
-			lastFullServerJob, fullJobErr := collector.connection.LastFullJob(server)
 			scheduledJob, scheduledJobErr := collector.connection.ScheduledJobs(server)
 			lastJobStatus, lastJobStatusErr := collector.connection.LastJobStatus(server)
 
-			if filesErr != nil || bytesErr != nil || jobErr != nil || fullJobErr != nil || scheduledJobErr != nil || lastJobStatusErr != nil {
+			if filesErr != nil || bytesErr != nil || jobErr != nil  || scheduledJobErr != nil || lastJobStatusErr != nil {
 				log.Info(server)
 			}
 
@@ -152,12 +137,6 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 				}).Error(jobErr)
 			}
 
-			if fullJobErr != nil {
-				log.WithFields(log.Fields{
-					"method": "LastFullJob",
-				}).Error(fullJobErr)
-			}
-
 			if scheduledJobErr != nil {
 				log.WithFields(log.Fields{
 					"method": "ScheduledJobs",
@@ -177,7 +156,8 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(collector.LastJobBytes, prometheus.CounterValue, float64(lastServerJob.JobBytes), server, lastServerJob.Level)
 			ch <- prometheus.MustNewConstMetric(collector.LastJobFiles, prometheus.CounterValue, float64(lastServerJob.JobFiles), server, lastServerJob.Level)
 			ch <- prometheus.MustNewConstMetric(collector.LastJobErrors, prometheus.CounterValue, float64(lastServerJob.JobErrors), server, lastServerJob.Level)
-			ch <- prometheus.MustNewConstMetric(collector.LastJobTimestamp, prometheus.CounterValue, float64(lastServerJob.JobDate.Unix()), server, lastServerJob.Level)
+			ch <- prometheus.MustNewConstMetric(collector.LastJobStartTimestamp, prometheus.CounterValue, float64(lastServerJob.JobStartDate.Unix()), server, lastServerJob.Level)
+			ch <- prometheus.MustNewConstMetric(collector.LastJobEndTimestamp, prometheus.CounterValue, float64(lastServerJob.JobEndDate.Unix()), server, lastServerJob.Level)
 			for _, terminationState := range bareosTerminationStates {
 				var state = float64(0)
 				if lastJobStatus != nil {
@@ -189,11 +169,6 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 				ch <- prometheus.MustNewConstMetric(collector.LastJobStatus, prometheus.CounterValue, state, server, terminationState)
 
 			}
-
-			ch <- prometheus.MustNewConstMetric(collector.LastFullJobBytes, prometheus.CounterValue, float64(lastFullServerJob.JobBytes), server)
-			ch <- prometheus.MustNewConstMetric(collector.LastFullJobFiles, prometheus.CounterValue, float64(lastFullServerJob.JobFiles), server)
-			ch <- prometheus.MustNewConstMetric(collector.LastFullJobErrors, prometheus.CounterValue, float64(lastFullServerJob.JobErrors), server)
-			ch <- prometheus.MustNewConstMetric(collector.LastFullJobTimestamp, prometheus.CounterValue, float64(lastFullServerJob.JobDate.Unix()), server)
 
 			ch <- prometheus.MustNewConstMetric(collector.ScheduledJob, prometheus.CounterValue, float64(scheduledJob.ScheduledJobs), server)
 

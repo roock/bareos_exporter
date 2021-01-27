@@ -29,9 +29,8 @@ var mysqlQueries *sqlQueries = &sqlQueries{
 	ServerList:    "SELECT DISTINCT Name FROM Job WHERE SchedTime >= ?",
 	TotalBytes:    "SELECT SUM(JobBytes) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
 	TotalFiles:    "SELECT SUM(JobFiles) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-	LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM Job WHERE Name = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+	LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
-	LastFullJob:   "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM Job WHERE Name = ? AND Level = 'F' AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
 	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 }
@@ -40,9 +39,8 @@ var postgresQueries *sqlQueries = &sqlQueries{
 	ServerList:    "SELECT DISTINCT Name FROM job WHERE SchedTime >= $1",
 	TotalBytes:    "SELECT SUM(JobBytes) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
 	TotalFiles:    "SELECT SUM(JobFiles) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-	LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM job WHERE Name = $1 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+	LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
-	LastFullJob:   "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM job WHERE Name = $1 AND Level = 'F' AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
 	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 }
@@ -149,7 +147,7 @@ func (connection Connection) LastJob(server string) (*LastJob, error) {
 
 	var lastJob LastJob
 	if results.Next() {
-		err = results.Scan(&lastJob.Level, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobDate)
+		err = results.Scan(&lastJob.Level, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobStartDate, &lastJob.JobEndDate)
 	}
 
 	return &lastJob, err
@@ -168,22 +166,6 @@ func (connection Connection) LastJobStatus(server string) (*string, error) {
 		err = results.Scan(&jobStatus)
 	}
 	return &jobStatus, err
-}
-
-// LastFullJob returns metrics for latest executed server backup with Level F
-func (connection Connection) LastFullJob(server string) (*LastJob, error) {
-	results, err := connection.execQuery(connection.queries.LastFullJob, server)
-	if err != nil {
-		return nil, err
-	}
-	defer results.Close()
-
-	var lastJob LastJob
-	if results.Next() {
-		err = results.Scan(&lastJob.Level, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobDate)
-	}
-
-	return &lastJob, err
 }
 
 // ScheduledJobs returns amount of scheduled jobs
