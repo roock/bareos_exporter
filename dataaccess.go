@@ -60,6 +60,11 @@ func GetConnection(databaseType string, connectionString string) (*Connection, e
 		return nil, err
 	}
 
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Connection{
 		db:      db,
 		queries: selectedQueries,
