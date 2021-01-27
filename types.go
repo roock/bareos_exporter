@@ -21,13 +21,10 @@ type PoolInfo struct {
 	Expired  bool   `json:"expired"`
 }
 
-// TotalBytes models query result of saved bytes sum for a server
-type TotalBytes struct {
-	Bytes int `json:"files"`
-}
-
-// TotalFiles models query result of saved files sum for a server
-type TotalFiles struct {
+// JobTotals models query result of sum for all jobs
+type JobTotals struct {
+	Count int `json:"count"`
+	Bytes int `json:"bytes"`
 	Files int `json:"files"`
 }
 

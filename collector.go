@@ -8,14 +8,15 @@ import (
 )
 
 type bareosMetrics struct {
-	TotalFiles       *prometheus.Desc
-	TotalBytes       *prometheus.Desc
-	LastJobBytes     *prometheus.Desc
-	LastJobFiles     *prometheus.Desc
-	LastJobErrors    *prometheus.Desc
+	TotalJobs             *prometheus.Desc
+	TotalFiles            *prometheus.Desc
+	TotalBytes            *prometheus.Desc
+	LastJobBytes          *prometheus.Desc
+	LastJobFiles          *prometheus.Desc
+	LastJobErrors         *prometheus.Desc
 	LastJobStartTimestamp *prometheus.Desc
-	LastJobEndTimestamp *prometheus.Desc
-	LastJobStatus    *prometheus.Desc
+	LastJobEndTimestamp   *prometheus.Desc
+	LastJobStatus         *prometheus.Desc
 
 	LastFullJobBytes     *prometheus.Desc
 	LastFullJobFiles     *prometheus.Desc
@@ -32,6 +33,10 @@ type bareosMetrics struct {
 
 func bareosCollector(conn *Connection) *bareosMetrics {
 	return &bareosMetrics{
+		TotalJobs: prometheus.NewDesc("bareos_jobs_run_total",
+			"Total backup jobs for hostname combined",
+			[]string{"hostname"}, nil,
+		),
 		TotalFiles: prometheus.NewDesc("bareos_files_saved_total",
 			"Total files saved for server during all backups for hostname combined",
 			[]string{"hostname"}, nil,
@@ -109,26 +114,19 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 	} else {
 
 		for _, server := range servers {
-			serverFiles, filesErr := collector.connection.TotalFiles(server)
-			serverBytes, bytesErr := collector.connection.TotalBytes(server)
+			jobTotals, jobTotalsErr := collector.connection.JobTotals(server)
 			lastServerJob, jobErr := collector.connection.LastJob(server)
 			scheduledJob, scheduledJobErr := collector.connection.ScheduledJobs(server)
 			lastJobStatus, lastJobStatusErr := collector.connection.LastJobStatus(server)
 
-			if filesErr != nil || bytesErr != nil || jobErr != nil  || scheduledJobErr != nil || lastJobStatusErr != nil {
+			if jobTotalsErr != nil || jobErr != nil || scheduledJobErr != nil || lastJobStatusErr != nil {
 				log.Info(server)
 			}
 
-			if filesErr != nil {
+			if jobTotalsErr != nil {
 				log.WithFields(log.Fields{
-					"method": "TotalFiles",
-				}).Error(filesErr)
-			}
-
-			if bytesErr != nil {
-				log.WithFields(log.Fields{
-					"method": "TotalBytes",
-				}).Error(bytesErr)
+					"method": "JobTotals",
+				}).Error(jobTotalsErr)
 			}
 
 			if jobErr != nil {
@@ -143,15 +141,15 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 				}).Error(scheduledJobErr)
 			}
 
-			if lastJobStatus != nil {
-
+			if lastJobStatusErr != nil {
 				log.WithFields(log.Fields{
 					"method": "LastJobStatus",
 				}).Error(lastJobStatusErr)
 			}
 
-			ch <- prometheus.MustNewConstMetric(collector.TotalFiles, prometheus.CounterValue, float64(serverFiles.Files), server)
-			ch <- prometheus.MustNewConstMetric(collector.TotalBytes, prometheus.CounterValue, float64(serverBytes.Bytes), server)
+			ch <- prometheus.MustNewConstMetric(collector.TotalJobs, prometheus.CounterValue, float64(jobTotals.Count), server)
+			ch <- prometheus.MustNewConstMetric(collector.TotalBytes, prometheus.CounterValue, float64(jobTotals.Bytes), server)
+			ch <- prometheus.MustNewConstMetric(collector.TotalFiles, prometheus.CounterValue, float64(jobTotals.Files), server)
 
 			ch <- prometheus.MustNewConstMetric(collector.LastJobBytes, prometheus.CounterValue, float64(lastServerJob.JobBytes), server, lastServerJob.Level)
 			ch <- prometheus.MustNewConstMetric(collector.LastJobFiles, prometheus.CounterValue, float64(lastServerJob.JobFiles), server, lastServerJob.Level)

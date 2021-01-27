@@ -16,8 +16,7 @@ type Connection struct {
 
 type sqlQueries struct {
 	ServerList    string
-	TotalBytes    string
-	TotalFiles    string
+	JobTotals     string
 	LastJob       string
 	LastJobStatus string
 	LastFullJob   string
@@ -28,8 +27,7 @@ type sqlQueries struct {
 var queries map[string]*sqlQueries = map[string]*sqlQueries{
 	"mysql": &sqlQueries{
 		ServerList:    "SELECT DISTINCT Name FROM Job WHERE SchedTime >= ?",
-		TotalBytes:    "SELECT SUM(JobBytes) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-		TotalFiles:    "SELECT SUM(JobFiles) FROM Job WHERE Name=? AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
+		JobTotals:     "SELECT COUNT(*), SUM(JobBytes), SUM(JobFiles) FROM Job WHERE Name=? AND PurgedFiles=0",
 		LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 		LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
 		ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
@@ -37,8 +35,7 @@ var queries map[string]*sqlQueries = map[string]*sqlQueries{
 	},
 	"postgres": &sqlQueries{
 		ServerList:    "SELECT DISTINCT Name FROM job WHERE SchedTime >= $1",
-		TotalBytes:    "SELECT SUM(JobBytes) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
-		TotalFiles:    "SELECT SUM(JobFiles) FROM job WHERE Name=$1 AND PurgedFiles=0 AND JobStatus IN('T', 'W')",
+		JobTotals:     "SELECT COUNT(*), SUM(JobBytes), SUM(JobFiles) FROM job WHERE Name=$1 AND PurgedFiles=0",
 		LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 		LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
 		ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
@@ -107,36 +104,20 @@ func (connection Connection) execQuery(query string, args ...interface{}) (*sql.
 	return results, err
 }
 
-// TotalBytes returns total bytes saved for a server since the very first backup
-func (connection Connection) TotalBytes(server string) (*TotalBytes, error) {
-	results, err := connection.execQuery(connection.queries.TotalBytes, server)
+func (connection Connection) JobTotals(server string) (*JobTotals, error) {
+	results, err := connection.execQuery(connection.queries.JobTotals, server)
 	if err != nil {
 		return nil, err
 	}
 	defer results.Close()
 
-	var totalBytes TotalBytes
+	var jobTotals JobTotals
 	if results.Next() {
-		err = results.Scan(&totalBytes.Bytes)
+		err = results.Scan(&jobTotals.Count, &jobTotals.Bytes, &jobTotals.Files)
 	}
 
-	return &totalBytes, err
-}
+	return &jobTotals, err
 
-// TotalFiles returns total files saved for a server since the very first backup
-func (connection Connection) TotalFiles(server string) (*TotalFiles, error) {
-	results, err := connection.execQuery(connection.queries.TotalFiles, server)
-	if err != nil {
-		return nil, err
-	}
-	defer results.Close()
-
-	var totalFiles TotalFiles
-	if results.Next() {
-		err = results.Scan(&totalFiles.Files)
-	}
-
-	return &totalFiles, err
 }
 
 // LastJob returns metrics for latest executed server backup
