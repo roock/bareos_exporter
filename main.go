@@ -1,8 +1,6 @@
 package main
 
 import (
-	"github.com/vierbergenlars/bareos_exporter/dataaccess"
-
 	"flag"
 	"fmt"
 	"net/http"
@@ -48,7 +46,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	connection, err := dataaccess.GetConnection(dbType, connectionString)
+	connection, err := GetConnection(dbType, connectionString)
 	if err != nil {
 		panic(err.Error())
 	}

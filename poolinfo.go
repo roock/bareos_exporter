@@ -1,4 +1,4 @@
-package types
+package main
 
 // PoolInfo models query result of pool information
 type PoolInfo struct {
@@ -6,4 +6,5 @@ type PoolInfo struct {
 	Volumes  int    `json:"volumes"`
 	Bytes    int    `json:"files"`
 	Prunable bool   `json:"prunable"`
+	Expired  bool   `json:"expired"`
 }

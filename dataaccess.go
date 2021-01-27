@@ -1,4 +1,4 @@
-package dataaccess
+package main
 
 import (
 	"database/sql"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/vierbergenlars/bareos_exporter/types"
 )
 
 // Connection to database, and database specific queries
@@ -34,7 +33,7 @@ var mysqlQueries *sqlQueries = &sqlQueries{
 	LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
 	LastFullJob:   "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM Job WHERE Name = ? AND Level = 'F' AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
-	PoolInfo:      "SELECT p.name, sum(m.volbytes) as bytes, COUNT(m) as volumes, 0 as prunable FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name",
+	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 }
 
 var postgresQueries *sqlQueries = &sqlQueries{
@@ -45,7 +44,7 @@ var postgresQueries *sqlQueries = &sqlQueries{
 	LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
 	LastFullJob:   "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime FROM job WHERE Name = $1 AND Level = 'F' AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 	ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
-	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable",
+	PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 }
 
 // GetConnection opens a new db connection
@@ -76,11 +75,12 @@ func GetConnection(databaseType string, connectionString string) (*Connection, e
 func (connection Connection) GetServerList() ([]string, error) {
 	date := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 	results, err := connection.execQuery(connection.queries.ServerList, date)
-	defer results.Close()
 
 	if err != nil {
 		return nil, err
 	}
+
+	defer results.Close()
 
 	var servers []string
 
@@ -108,15 +108,14 @@ func (connection Connection) execQuery(query string, args ...interface{}) (*sql.
 }
 
 // TotalBytes returns total bytes saved for a server since the very first backup
-func (connection Connection) TotalBytes(server string) (*types.TotalBytes, error) {
+func (connection Connection) TotalBytes(server string) (*TotalBytes, error) {
 	results, err := connection.execQuery(connection.queries.TotalBytes, server)
-	defer results.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
-	var totalBytes types.TotalBytes
+	var totalBytes TotalBytes
 	if results.Next() {
 		err = results.Scan(&totalBytes.Bytes)
 	}
@@ -125,15 +124,14 @@ func (connection Connection) TotalBytes(server string) (*types.TotalBytes, error
 }
 
 // TotalFiles returns total files saved for a server since the very first backup
-func (connection Connection) TotalFiles(server string) (*types.TotalFiles, error) {
+func (connection Connection) TotalFiles(server string) (*TotalFiles, error) {
 	results, err := connection.execQuery(connection.queries.TotalFiles, server)
-	defer results.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
-	var totalFiles types.TotalFiles
+	var totalFiles TotalFiles
 	if results.Next() {
 		err = results.Scan(&totalFiles.Files)
 	}
@@ -142,15 +140,14 @@ func (connection Connection) TotalFiles(server string) (*types.TotalFiles, error
 }
 
 // LastJob returns metrics for latest executed server backup
-func (connection Connection) LastJob(server string) (*types.LastJob, error) {
+func (connection Connection) LastJob(server string) (*LastJob, error) {
 	results, err := connection.execQuery(connection.queries.LastJob, server)
-	defer results.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
-	var lastJob types.LastJob
+	var lastJob LastJob
 	if results.Next() {
 		err = results.Scan(&lastJob.Level, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobDate)
 	}
@@ -161,11 +158,10 @@ func (connection Connection) LastJob(server string) (*types.LastJob, error) {
 // LastJobStatus returns metrics for the status of the latest executed server backup
 func (connection Connection) LastJobStatus(server string) (*string, error) {
 	results, err := connection.execQuery(connection.queries.LastJobStatus, server)
-	defer results.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
 	var jobStatus string
 	if results.Next() {
@@ -175,15 +171,14 @@ func (connection Connection) LastJobStatus(server string) (*string, error) {
 }
 
 // LastFullJob returns metrics for latest executed server backup with Level F
-func (connection Connection) LastFullJob(server string) (*types.LastJob, error) {
+func (connection Connection) LastFullJob(server string) (*LastJob, error) {
 	results, err := connection.execQuery(connection.queries.LastFullJob, server)
-	defer results.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
-	var lastJob types.LastJob
+	var lastJob LastJob
 	if results.Next() {
 		err = results.Scan(&lastJob.Level, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobDate)
 	}
@@ -192,16 +187,15 @@ func (connection Connection) LastFullJob(server string) (*types.LastJob, error) 
 }
 
 // ScheduledJobs returns amount of scheduled jobs
-func (connection Connection) ScheduledJobs(server string) (*types.ScheduledJob, error) {
+func (connection Connection) ScheduledJobs(server string) (*ScheduledJob, error) {
 	date := time.Now().Format("2006-01-02")
 	results, err := connection.execQuery(connection.queries.ScheduledJobs, server, date)
-	defer results.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
-	var schedJob types.ScheduledJob
+	var schedJob ScheduledJob
 	if results.Next() {
 		err = results.Scan(&schedJob.ScheduledJobs)
 		results.Close()
@@ -210,48 +204,43 @@ func (connection Connection) ScheduledJobs(server string) (*types.ScheduledJob, 
 	return &schedJob, err
 }
 
-func (connection Connection) PoolInfo() ([]types.PoolInfo, error) {
-	results, err := connection.execQuery(connection.queries.PoolInfo)
-	defer results.Close()
+type poolInfoState struct {
+	Prunable bool
+	Expired  bool
+}
 
+func (connection Connection) PoolInfo() ([]PoolInfo, error) {
+	results, err := connection.execQuery(connection.queries.PoolInfo)
 	if err != nil {
 		return nil, err
 	}
+	defer results.Close()
 
-	var poolInfoList []types.PoolInfo
+	var poolInfoList []PoolInfo
 
-	var withPrunable []string
-	var withoutPrunable []string
+	poolInfoStates := make(map[string][]poolInfoState)
 
 	for results.Next() {
-		var poolInfo types.PoolInfo
-		err = results.Scan(&poolInfo.Name, &poolInfo.Bytes, &poolInfo.Volumes, &poolInfo.Prunable)
+		var poolInfo PoolInfo
+		err = results.Scan(&poolInfo.Name, &poolInfo.Bytes, &poolInfo.Volumes, &poolInfo.Prunable, &poolInfo.Expired)
 		if err != nil {
 			return nil, err
 		}
-		if poolInfo.Prunable {
-			withPrunable = append(withPrunable, poolInfo.Name)
-		} else {
-			withoutPrunable = append(withoutPrunable, poolInfo.Name)
-		}
+		poolInfoStates[poolInfo.Name] = append(poolInfoStates[poolInfo.Name], poolInfoState{
+			Prunable: poolInfo.Prunable,
+			Expired:  poolInfo.Expired,
+		})
 
 		poolInfoList = append(poolInfoList, poolInfo)
 	}
 
-	for _, poolInfo := range poolInfoList {
-		if !hasItem(withPrunable, poolInfo.Name) {
-			poolInfoList = append(poolInfoList, types.PoolInfo{
-				Name:     poolInfo.Name,
-				Prunable: true,
-				Volumes:  0,
-				Bytes:    0,
-			})
-		}
-
-		if !hasItem(withoutPrunable, poolInfo.Name) {
-			poolInfoList = append(poolInfoList, types.PoolInfo{
-				Name:     poolInfo.Name,
-				Prunable: false,
+	for poolName, states := range poolInfoStates {
+		missingStates := createMissingStates(states)
+		for _, missingState := range missingStates {
+			poolInfoList = append(poolInfoList, PoolInfo{
+				Name:     poolName,
+				Prunable: missingState.Prunable,
+				Expired:  missingState.Expired,
 				Volumes:  0,
 				Bytes:    0,
 			})
@@ -259,7 +248,44 @@ func (connection Connection) PoolInfo() ([]types.PoolInfo, error) {
 	}
 
 	return poolInfoList, nil
+}
 
+var allPoolInfoStates []poolInfoState = []poolInfoState{
+	{
+		Prunable: false,
+		Expired:  false,
+	},
+	{
+		Prunable: true,
+		Expired:  false,
+	},
+	{
+		Prunable: false,
+		Expired:  true,
+	},
+	{
+		Prunable: true,
+		Expired:  true,
+	},
+}
+
+func createMissingStates(lst []poolInfoState) []poolInfoState {
+	var missingStates []poolInfoState
+	for _, infoState := range allPoolInfoStates {
+		if !hasState(lst, infoState) {
+			missingStates = append(missingStates, infoState)
+		}
+	}
+	return missingStates
+}
+
+func hasState(lst []poolInfoState, itm poolInfoState) bool {
+	for _, i := range lst {
+		if i.Prunable == itm.Prunable && i.Expired == itm.Expired {
+			return true
+		}
+	}
+	return false
 }
 
 func hasItem(lst []string, itm string) bool {

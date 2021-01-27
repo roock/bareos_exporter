@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/vierbergenlars/bareos_exporter/dataaccess"
 
 	log "github.com/sirupsen/logrus"
 	"strconv"
@@ -27,10 +26,10 @@ type bareosMetrics struct {
 	PoolBytes   *prometheus.Desc
 	PoolVolumes *prometheus.Desc
 
-	connection *dataaccess.Connection
+	connection *Connection
 }
 
-func bareosCollector(conn *dataaccess.Connection) *bareosMetrics {
+func bareosCollector(conn *Connection) *bareosMetrics {
 	return &bareosMetrics{
 		TotalFiles: prometheus.NewDesc("bareos_files_saved_total",
 			"Total files saved for server during all backups for hostname combined",
@@ -82,11 +81,11 @@ func bareosCollector(conn *dataaccess.Connection) *bareosMetrics {
 		),
 		PoolBytes: prometheus.NewDesc("bareos_pool_bytes",
 			"Total bytes saved in a pool",
-			[]string{"pool", "prunable"}, nil,
+			[]string{"pool", "prunable", "expired"}, nil,
 		),
 		PoolVolumes: prometheus.NewDesc("bareos_pool_volumes",
 			"Total volumes in a pool",
-			[]string{"pool", "prunable"}, nil,
+			[]string{"pool", "prunable", "expired"}, nil,
 		),
 		connection: conn,
 	}
@@ -210,8 +209,8 @@ func (collector *bareosMetrics) Collect(ch chan<- prometheus.Metric) {
 	} else {
 
 		for _, poolInfo := range poolInfoList {
-			ch <- prometheus.MustNewConstMetric(collector.PoolBytes, prometheus.CounterValue, float64(poolInfo.Bytes), poolInfo.Name, strconv.FormatBool(poolInfo.Prunable))
-			ch <- prometheus.MustNewConstMetric(collector.PoolVolumes, prometheus.CounterValue, float64(poolInfo.Volumes), poolInfo.Name, strconv.FormatBool(poolInfo.Prunable))
+			ch <- prometheus.MustNewConstMetric(collector.PoolBytes, prometheus.CounterValue, float64(poolInfo.Bytes), poolInfo.Name, strconv.FormatBool(poolInfo.Prunable), strconv.FormatBool(poolInfo.Expired))
+			ch <- prometheus.MustNewConstMetric(collector.PoolVolumes, prometheus.CounterValue, float64(poolInfo.Volumes), poolInfo.Name, strconv.FormatBool(poolInfo.Prunable), strconv.FormatBool(poolInfo.Expired))
 		}
 	}
 }
