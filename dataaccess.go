@@ -81,7 +81,7 @@ func (connection Connection) JobList() ([]JobInfo, error) {
 
 	for results.Next() {
 		var jobInfo JobInfo
-		err = results.Scan(&jobInfo.JobName, &jobInfo.JobType, &jobInfo.clientId, &jobInfo.fileSetId, &jobInfo.ClientName, &jobInfo.FileSetName, &jobInfo.TotalCount, &jobInfo.TotalBytes, &jobInfo.TotalBytes)
+		err = results.Scan(&jobInfo.JobName, &jobInfo.JobType, &jobInfo.clientId, &jobInfo.fileSetId, &jobInfo.ClientName, &jobInfo.FileSetName, &jobInfo.TotalCount, &jobInfo.TotalBytes, &jobInfo.TotalFiles)
 		if err != nil {
 			return nil, err
 		}
