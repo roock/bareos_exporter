@@ -189,21 +189,21 @@ func (collector *bareosMetrics) collectLastJob(ch chan<- prometheus.Metric, jobI
 	var bareosTerminationStates, bareosTerminationStatesErr = collector.connection.JobStates()
 
 	if bareosTerminationStatesErr != nil {
-				log.WithFields(log.Fields{
-					"job":    jobInfo,
-					"method": "JobStates",
-				}).Error(bareosTerminationStatesErr)
+		log.WithFields(log.Fields{
+			"job":    jobInfo,
+			"method": "JobStates",
+		}).Error(bareosTerminationStatesErr)
 	} else {
-	for _, terminationState := range bareosTerminationStates {
-		var state = float64(0)
-		if lastJob != nil {
-		if terminationState == lastJob.JobStatus {
-			state = 1
+		for _, terminationState := range bareosTerminationStates {
+			var state = float64(0)
+			if lastJob != nil {
+				if terminationState == lastJob.JobStatus {
+					state = 1
+				}
+			}
+
+			ch <- prometheus.MustNewConstMetric(collector.LastJobStatus, prometheus.CounterValue, state, labels.newAppend(terminationState)...)
+
 		}
 	}
-
-		ch <- prometheus.MustNewConstMetric(collector.LastJobStatus, prometheus.CounterValue, state, labels.newAppend(terminationState)...)
-
-	}
-}
 }
