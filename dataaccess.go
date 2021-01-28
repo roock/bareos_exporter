@@ -34,9 +34,9 @@ var queries map[string]*sqlQueries = map[string]*sqlQueries{
 	},
 	"postgres": &sqlQueries{
 		JobList:               "SELECT j.Name, j.Type, j.ClientId, j.FileSetId, COALESCE(c.Name, ''), COALESCE(f.FileSet, ''), COUNT(*), SUM(j.JobBytes), SUM(j.JobFiles) FROM job j LEFT JOIN client c ON c.ClientId = j.ClientId LEFT JOIN fileset f ON f.FileSetId = j.FileSetId  GROUP BY j.Name, j.Type, j.ClientId, j.FileSetId, c.Name, f.FileSet HAVING MAX(j.SchedTime) >= $1",
-		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = ? AND ClientId = ? AND FileSetId = ? ORDER BY StartTime DESC LIMIT 1",
-		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
+		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
 		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 		JobStates:             "SELECT JobStatus FROM status",
 	},
