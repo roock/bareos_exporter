@@ -15,31 +15,30 @@ type Connection struct {
 }
 
 type sqlQueries struct {
-	ServerList    string
-	JobTotals     string
-	LastJob       string
-	LastJobStatus string
-	LastFullJob   string
-	ScheduledJobs string
-	PoolInfo      string
+	JobList               string
+	LastJob               string
+	LastSuccessfulJob     string
+	LastSuccessfulFullJob string
+	PoolInfo              string
+	JobStates             string
 }
 
 var queries map[string]*sqlQueries = map[string]*sqlQueries{
 	"mysql": &sqlQueries{
-		ServerList:    "SELECT DISTINCT Name FROM Job WHERE SchedTime >= ?",
-		JobTotals:     "SELECT COUNT(*), SUM(JobBytes), SUM(JobFiles) FROM Job WHERE Name=? AND PurgedFiles=0",
-		LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-		LastJobStatus: "SELECT JobStatus FROM Job WHERE Name = ? ORDER BY StartTime DESC LIMIT 1",
-		ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM Job WHERE Name = ? AND SchedTime >= ?",
-		PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		JobList:               "SELECT j.Name, j.Type, j.ClientId, j.FileSetId, COALESCE(c.Name, ''), COALESCE(f.FileSet, ''), COUNT(*), SUM(j.JobBytes), SUM(j.JobFiles) FROM Job j LEFT JOIN Client c ON c.ClientId = j.ClientId LEFT JOIN FileSet f ON f.FileSetId = j.FileSetId GROUP BY j.Name, j.Type, j.ClientId, j.FileSetId, c.Name, f.FileSet HAVING MAX(j.SchedTime) >= ?",
+		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
+		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		JobStates:             "SELECT JobStatus FROM Status",
 	},
 	"postgres": &sqlQueries{
-		ServerList:    "SELECT DISTINCT Name FROM job WHERE SchedTime >= $1",
-		JobTotals:     "SELECT COUNT(*), SUM(JobBytes), SUM(JobFiles) FROM job WHERE Name=$1 AND PurgedFiles=0",
-		LastJob:       "SELECT Level,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-		LastJobStatus: "SELECT JobStatus FROM job WHERE Name = $1 ORDER BY StartTime DESC LIMIT 1",
-		ScheduledJobs: "SELECT COUNT(SchedTime) AS JobsScheduled FROM job WHERE Name = $1 AND SchedTime >= $2",
-		PoolInfo:      "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		JobList:               "SELECT j.Name, j.Type, j.ClientId, j.FileSetId, COALESCE(c.Name, ''), COALESCE(f.FileSet, ''), COUNT(*), SUM(j.JobBytes), SUM(j.JobFiles) FROM job j LEFT JOIN client c ON c.ClientId = j.ClientId LEFT JOIN fileset f ON f.FileSetId = j.FileSetId  GROUP BY j.Name, j.Type, j.ClientId, j.FileSetId, c.Name, f.FileSet HAVING MAX(j.SchedTime) >= $1",
+		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = ? AND ClientId = ? AND FileSetId = ? ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
+		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		JobStates:             "SELECT JobStatus FROM status",
 	},
 }
 
@@ -68,10 +67,9 @@ func GetConnection(databaseType string, connectionString string) (*Connection, e
 	}, nil
 }
 
-// GetServerList reads all servers with scheduled backups for current date
-func (connection Connection) GetServerList() ([]string, error) {
+func (connection Connection) JobList() ([]JobInfo, error) {
 	date := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
-	results, err := connection.execQuery(connection.queries.ServerList, date)
+	results, err := connection.execQuery(connection.queries.JobList, date)
 
 	if err != nil {
 		return nil, err
@@ -79,18 +77,18 @@ func (connection Connection) GetServerList() ([]string, error) {
 
 	defer results.Close()
 
-	var servers []string
+	var jobs []JobInfo
 
 	for results.Next() {
-		var server string
-		err = results.Scan(&server)
+		var jobInfo JobInfo
+		err = results.Scan(&jobInfo.JobName, &jobInfo.JobType, &jobInfo.clientId, &jobInfo.fileSetId, &jobInfo.ClientName, &jobInfo.FileSetName, &jobInfo.TotalCount, &jobInfo.TotalBytes, &jobInfo.TotalBytes)
 		if err != nil {
 			return nil, err
 		}
-		servers = append(servers, server)
+		jobs = append(jobs, jobInfo)
 	}
 
-	return servers, err
+	return jobs, nil
 }
 
 func (connection Connection) execQuery(query string, args ...interface{}) (*sql.Rows, error) {
@@ -104,25 +102,12 @@ func (connection Connection) execQuery(query string, args ...interface{}) (*sql.
 	return results, err
 }
 
-func (connection Connection) JobTotals(server string) (*JobTotals, error) {
-	results, err := connection.execQuery(connection.queries.JobTotals, server)
-	if err != nil {
-		return nil, err
-	}
-	defer results.Close()
-
-	var jobTotals JobTotals
-	if results.Next() {
-		err = results.Scan(&jobTotals.Count, &jobTotals.Bytes, &jobTotals.Files)
-	}
-
-	return &jobTotals, err
-
+func (connection Connection) execJobLookupQuery(query string, lookup *JobInfo) (*sql.Rows, error) {
+	return connection.execQuery(query, lookup.JobName, lookup.clientId, lookup.fileSetId)
 }
 
-// LastJob returns metrics for latest executed server backup
-func (connection Connection) LastJob(server string) (*LastJob, error) {
-	results, err := connection.execQuery(connection.queries.LastJob, server)
+func (connection Connection) execLastJobLookupQuery(query string, lookup *JobInfo) (*LastJob, error) {
+	results, err := connection.execJobLookupQuery(connection.queries.LastJob, lookup)
 	if err != nil {
 		return nil, err
 	}
@@ -130,43 +115,48 @@ func (connection Connection) LastJob(server string) (*LastJob, error) {
 
 	var lastJob LastJob
 	if results.Next() {
-		err = results.Scan(&lastJob.Level, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobStartDate, &lastJob.JobEndDate)
+		err = results.Scan(&lastJob.JobStatus, &lastJob.JobBytes, &lastJob.JobFiles, &lastJob.JobErrors, &lastJob.JobStartDate, &lastJob.JobEndDate)
 	}
 
 	return &lastJob, err
 }
 
-// LastJobStatus returns metrics for the status of the latest executed server backup
-func (connection Connection) LastJobStatus(server string) (*string, error) {
-	results, err := connection.execQuery(connection.queries.LastJobStatus, server)
-	if err != nil {
-		return nil, err
-	}
-	defer results.Close()
-
-	var jobStatus string
-	if results.Next() {
-		err = results.Scan(&jobStatus)
-	}
-	return &jobStatus, err
+// LastJob returns metrics for latest executed server backup
+func (connection Connection) LastJob(lookup *JobInfo) (*LastJob, error) {
+	return connection.execLastJobLookupQuery(connection.queries.LastJob, lookup)
 }
 
-// ScheduledJobs returns amount of scheduled jobs
-func (connection Connection) ScheduledJobs(server string) (*ScheduledJob, error) {
-	date := time.Now().Format("2006-01-02")
-	results, err := connection.execQuery(connection.queries.ScheduledJobs, server, date)
+// LastSuccessfulJob returns metrics for latest successfully executed server backup
+func (connection Connection) LastSuccessfulJob(lookup *JobInfo) (*LastJob, error) {
+	return connection.execLastJobLookupQuery(connection.queries.LastSuccessfulJob, lookup)
+}
+
+// LastSuccessfulFullJob returns metrics for latest successfully executed server backup with level Full
+func (connection Connection) LastSuccessfulFullJob(lookup *JobInfo) (*LastJob, error) {
+	return connection.execLastJobLookupQuery(connection.queries.LastSuccessfulFullJob, lookup)
+}
+
+func (connection Connection) JobStates() ([]string, error) {
+	results, err := connection.execQuery(connection.queries.JobStates)
+
 	if err != nil {
 		return nil, err
 	}
+
 	defer results.Close()
 
-	var schedJob ScheduledJob
-	if results.Next() {
-		err = results.Scan(&schedJob.ScheduledJobs)
-		results.Close()
+	var states []string
+
+	for results.Next() {
+		var state string
+		err = results.Scan(&state)
+		if err != nil {
+			return nil, err
+		}
+		states = append(states, state)
 	}
 
-	return &schedJob, err
+	return states, nil
 }
 
 type poolInfoState struct {

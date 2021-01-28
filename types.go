@@ -2,33 +2,58 @@ package main
 
 import "time"
 
+type JobType string
+
+const (
+	BackupJob      JobType = "B"
+	MigratedJob            = "J"
+	VerifyJob              = "V"
+	RestoreJob             = "R"
+	ConsoleJob             = "U"
+	SystemJob              = "I"
+	AdminJob               = "D"
+	ArchiveJob             = "A"
+	JobCopyJob             = "C"
+	CopyJob                = "c"
+	MigrateJob             = "J"
+	ScanJob                = "S"
+	ConsolidateJob         = "O"
+)
+
+type JobLookup struct {
+	JobName   string
+	clientId  int
+	fileSetId int
+}
+
+// JobInfo models query results for static values of a job
+type JobInfo struct {
+	JobLookup
+	JobType     JobType
+	JobName     string
+	ClientName  string
+	FileSetName string
+
+	TotalCount int
+	TotalBytes int
+	TotalFiles int
+}
+
 // LastJob models query results for job metrics
 type LastJob struct {
-	Level        string    `json:"level"`
-	JobBytes     int       `json:"job-bytes"`
-	JobFiles     int       `json:"job-files"`
-	JobErrors    int       `json:"job-errors"`
-	JobStartDate time.Time `json:"job-start-date"`
-	JobEndDate   time.Time `json:"job-end-date"`
+	JobStatus    string
+	JobBytes     int
+	JobFiles     int
+	JobErrors    int
+	JobStartDate time.Time
+	JobEndDate   time.Time
 }
 
 // PoolInfo models query result of pool information
 type PoolInfo struct {
-	Name     string `json:"name"`
-	Volumes  int    `json:"volumes"`
-	Bytes    int    `json:"files"`
-	Prunable bool   `json:"prunable"`
-	Expired  bool   `json:"expired"`
-}
-
-// JobTotals models query result of sum for all jobs
-type JobTotals struct {
-	Count int `json:"count"`
-	Bytes int `json:"bytes"`
-	Files int `json:"files"`
-}
-
-// ScheduledJob models query result of the time a job is about to be executed
-type ScheduledJob struct {
-	ScheduledJobs int `json:"scheduled-jobs"`
+	Name     string
+	Volumes  int
+	Bytes    int
+	Prunable bool
+	Expired  bool
 }
