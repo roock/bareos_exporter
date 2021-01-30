@@ -107,7 +107,7 @@ func (connection Connection) execJobLookupQuery(query string, lookup *JobInfo) (
 }
 
 func (connection Connection) execLastJobLookupQuery(query string, lookup *JobInfo) (*LastJob, error) {
-	results, err := connection.execJobLookupQuery(connection.queries.LastJob, lookup)
+	results, err := connection.execJobLookupQuery(query, lookup)
 	if err != nil {
 		return nil, err
 	}
