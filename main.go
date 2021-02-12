@@ -20,6 +20,7 @@ var (
 	exporterPort     = flag.Int("port", 9625, "Bareos exporter port")
 	exporterEndpoint = flag.String("endpoint", "/metrics", "Bareos exporter endpoint")
 	databaseURL      = flag.String("dsn", "mysql://bareos@unix()/bareos?parseTime=true", "Bareos database DSN")
+	jobDiscoveryDays = flag.Int("job-discovery-days", 7, "Number of days in the past that will be searched for jobs")
 )
 
 func init() {
@@ -46,7 +47,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	connection, err := GetConnection(dbType, connectionString)
+	connection, err := GetConnection(dbType, connectionString, *jobDiscoveryDays)
 	if err != nil {
 		panic(err.Error())
 	}

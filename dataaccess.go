@@ -10,8 +10,9 @@ import (
 
 // Connection to database, and database specific queries
 type Connection struct {
-	db      *sql.DB
-	queries *sqlQueries
+	db               *sql.DB
+	queries          *sqlQueries
+	jobDiscoveryDays int
 }
 
 type sqlQueries struct {
@@ -26,24 +27,24 @@ type sqlQueries struct {
 var queries map[string]*sqlQueries = map[string]*sqlQueries{
 	"mysql": &sqlQueries{
 		JobList:               "SELECT j.Name, j.Type, j.ClientId, j.FileSetId, COALESCE(c.Name, ''), COALESCE(f.FileSet, ''), COUNT(*), SUM(j.JobBytes), SUM(j.JobFiles) FROM Job j LEFT JOIN Client c ON c.ClientId = j.ClientId LEFT JOIN FileSet f ON f.FileSetId = j.FileSetId GROUP BY j.Name, j.Type, j.ClientId, j.FileSetId, c.Name, f.FileSet HAVING MAX(j.SchedTime) >= ?",
-		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? ORDER BY StartTime DESC LIMIT 1",
-		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
+		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
 		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 		JobStates:             "SELECT JobStatus FROM Status",
 	},
 	"postgres": &sqlQueries{
 		JobList:               "SELECT j.Name, j.Type, j.ClientId, j.FileSetId, COALESCE(c.Name, ''), COALESCE(f.FileSet, ''), COUNT(*), SUM(j.JobBytes), SUM(j.JobFiles) FROM job j LEFT JOIN client c ON c.ClientId = j.ClientId LEFT JOIN fileset f ON f.FileSetId = j.FileSetId  GROUP BY j.Name, j.Type, j.ClientId, j.FileSetId, c.Name, f.FileSet HAVING MAX(j.SchedTime) >= $1",
-		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 ORDER BY StartTime DESC LIMIT 1",
-		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
-		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,EndTime FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
+		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
+		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
 		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 		JobStates:             "SELECT JobStatus FROM status",
 	},
 }
 
 // GetConnection opens a new db connection
-func GetConnection(databaseType string, connectionString string) (*Connection, error) {
+func GetConnection(databaseType string, connectionString string, jobDiscoveryDays int) (*Connection, error) {
 	selectedQueries := queries[databaseType]
 
 	if selectedQueries == nil {
@@ -62,13 +63,14 @@ func GetConnection(databaseType string, connectionString string) (*Connection, e
 	}
 
 	return &Connection{
-		db:      db,
-		queries: selectedQueries,
+		db:               db,
+		queries:          selectedQueries,
+		jobDiscoveryDays: jobDiscoveryDays,
 	}, nil
 }
 
 func (connection Connection) JobList() ([]JobInfo, error) {
-	date := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	date := time.Now().AddDate(0, 0, -connection.jobDiscoveryDays).Format("2006-01-02")
 	results, err := connection.execQuery(connection.queries.JobList, date)
 
 	if err != nil {
