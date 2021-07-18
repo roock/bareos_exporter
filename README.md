@@ -79,3 +79,4 @@ Name    | Description                                                           
 port    | Bareos exporter port                                                                        | 9625
 endpoint| Bareos exporter endpoint.                                                                   | "/metrics"
 dsn     | Data source name of the database that is used by bareos. Protocol can be `mysql://` or `postgres://`. The rest of the string is passed to the database driver. | "mysql://bareos@unix()/bareos?parseTime=true" <br> "postgres://dbname=bareos sslmode=disable user=bareos password=bareos" <br> "postgres://host=/var/run/postgresql dbname=bareos"
+job-discovery-days | Number of days to look in the history to discover active jobs. Only jobs that have last run this number of days will be considered for data reporting. | 7
