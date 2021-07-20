@@ -1,0 +1,30 @@
+version: '2.2'
+
+services:
+    bareos_exporter:
+        ports:
+            - 9625
+        build:
+            context: ..
+        command:
+            - "-dsn"
+            - "mysql://bareos:bareos@tcp(database:3306)/bareos?parseTime=true"
+            - "-job-discovery-days"
+            - "20"
+        depends_on:
+            - database
+
+    database:
+        image: mariadb
+        environment:
+            MYSQL_RANDOM_ROOT_PASSWORD: 1
+            MYSQL_DATABASE: bareos
+            MYSQL_USER: bareos
+            MYSQL_PASSWORD: bareos
+
+        volumes:
+            - mysql:/var/lib/mysql
+            - ./mysql:/docker-entrypoint-initdb.d/:ro
+
+volumes:
+    mysql:
