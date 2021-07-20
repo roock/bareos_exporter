@@ -30,7 +30,7 @@ var queries map[string]*sqlQueries = map[string]*sqlQueries{
 		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? ORDER BY StartTime DESC LIMIT 1",
 		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId = ? AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
-		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW() AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, COALESCE(TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW(), false) AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 		JobStates:             "SELECT JobStatus FROM Status",
 	},
 	"postgres": &sqlQueries{
@@ -38,7 +38,7 @@ var queries map[string]*sqlQueries = map[string]*sqlQueries{
 		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime::timestamptz,COALESCE(EndTime::timestamptz, NOW()) FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 ORDER BY StartTime DESC LIMIT 1",
 		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime::timestamptz,COALESCE(EndTime::timestamptz, NOW()) FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime::timestamptz,COALESCE(EndTime::timestamptz, NOW()) FROM job WHERE Name = $1 AND ClientId = $2 AND FileSetId = $3 AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
-		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, (m.lastwritten + (m.volretention * interval '1s')) < NOW() as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(m) AS volumes, (not exists(select * from jobmedia jm where jm.mediaid = m.mediaid)) AS prunable, COALESCE((m.lastwritten + (m.volretention * interval '1s')) < NOW(), false) as expired FROM media m LEFT JOIN pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 		JobStates:             "SELECT JobStatus FROM status",
 	},
 }
