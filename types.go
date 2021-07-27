@@ -21,18 +21,17 @@ const (
 )
 
 type JobLookup struct {
-	JobName   string
-	clientId  int
-	fileSetId int
+	JobName     string
+	clientId    int
+	FileSetName string
 }
 
 // JobInfo models query results for static values of a job
 type JobInfo struct {
 	JobLookup
-	JobType     JobType
-	JobName     string
-	ClientName  string
-	FileSetName string
+	JobType    JobType
+	JobName    string
+	ClientName string
 
 	TotalCount int
 	TotalBytes int
