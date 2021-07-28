@@ -23,14 +23,6 @@ var (
 	jobDiscoveryDays = flag.Int("job-discovery-days", 7, "Number of days in the past that will be searched for jobs")
 )
 
-func init() {
-	flag.Usage = func() {
-		fmt.Println("Usage: bareos_exporter [ ... ]\n\nParameters:")
-		fmt.Println()
-		flag.PrintDefaults()
-	}
-}
-
 func splitDsn(dsn string) (string, string, error) {
 	var splitDsn = strings.SplitN(dsn, "://", 2)
 	if len(splitDsn) != 2 {
@@ -44,12 +36,12 @@ func main() {
 
 	dbType, connectionString, err := splitDsn(*databaseURL)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 
 	connection, err := GetConnection(dbType, connectionString, *jobDiscoveryDays)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 	defer connection.Close()
 	collector := bareosCollector(connection)
