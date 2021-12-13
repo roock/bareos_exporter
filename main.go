@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v4"
 )
 
 var connectionString string
