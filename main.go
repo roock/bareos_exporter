@@ -17,8 +17,8 @@ import (
 var (
 	exporterPort     = flag.Int("port", 9625, "Bareos exporter port")
 	exporterEndpoint = flag.String("endpoint", "/metrics", "Bareos exporter endpoint")
-	databaseURL      = flag.String("dsn", "mysql://bareos@unix()/bareos?parseTime=true", "Bareos database DSN")
-	databaseType     = flag.String("dbtype", "pgx", "mysql for mysql, pgx for postgres")
+	databaseURL      = flag.String("dsn", "postgres://bareos", "Bareos database DSN")
+	databaseType     = flag.String("dbtype", "pgx", "mysql for MySQL/MariaDB, pgx for PostgreSQL")
 	jobDiscoveryDays = flag.Int("job-discovery-days", 7, "Number of days in the past that will be searched for jobs")
 )
 

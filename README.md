@@ -1,17 +1,21 @@
 # bareos_exporter
-[![Go Report Card](https://goreportcard.com/badge/github.com/vierbergenlars/bareos_exporter)](https://goreportcard.com/report/github.com/vierbergenlars/bareos_exporter)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/b1-systems/bareos_exporter)](https://goreportcard.com/report/github.com/b1-systems/bareos_exporter)
 
 [Prometheus](https://github.com/prometheus) exporter for [bareos](https://github.com/bareos) data recovery system
 
 ## [`Dockerfile`](./Dockerfile)
 
 ## Usage with [docker](https://hub.docker.com/r/vierbergenlnars/bareos_exporter)
+
 1. Create a file containing your mysql password and mount it inside `/bareos_exporter/pw/auth`
 2. **(optional)** [Overwrite](https://docs.docker.com/engine/reference/run/#env-environment-variables) default args using ENV variables
 3. Run docker image as follows
+
 ```bash
-docker run --name bareos_exporter -p 9625:9625 -d vierbergenlars/bareos_exporter:latest -dsn mysql://user:password@host/dbname
+docker run --name bareos_exporter -p 9625:9625 -d b1-systems/bareos_exporter:latest -dbtype mysql -dsn mysql://user:password@host/dbname
 ```
+
 ## Metrics
 
 ### Aggregated metrics for all jobs
@@ -74,9 +78,14 @@ Labels:
 
 ## Flags
 
-Name    | Description                                                                                 | Default
---------|---------------------------------------------------------------------------------------------|----------------------
-port    | Bareos exporter port                                                                        | 9625
-endpoint| Bareos exporter endpoint.                                                                   | "/metrics"
-dsn     | Data source name of the database that is used by bareos. Protocol can be `mysql://` or `postgres://`. The rest of the string is passed to the database driver. | "mysql://bareos@unix()/bareos?parseTime=true" <br> "postgres://dbname=bareos sslmode=disable user=bareos password=bareos" <br> "postgres://host=/var/run/postgresql dbname=bareos"
-job-discovery-days | Number of days to look in the history to discover active jobs. Only jobs that have last run this number of days will be considered for data reporting. | 7
+| Name               | Description                                                                                                                                            | Default       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| port               | Bareos exporter port                                                                                                                                   | `9625`        |
+| endpoint           | Bareos exporter endpoint.                                                                                                                              | `/metrics`    |
+| dbtype             | Database type (`mysql` or `pgx` for PostgreSQL)                                                                                                        | `pgx`         |
+| dsn                | Data source name understood by [go-sql-driver/mysql] or [jakec/pgx]                                                                                    | `postgres://` |
+| job-discovery-days | Number of days to look in the history to discover active jobs. Only jobs that have last run this number of days will be considered for data reporting. | 7             |
+
+## TODO
+
+* [ ] Write some tests.
