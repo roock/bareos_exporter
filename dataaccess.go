@@ -30,7 +30,7 @@ var queries map[string]*sqlQueries = map[string]*sqlQueries{
 		LastJob:               "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId IN(SELECT f.FileSetId FROM FileSet f WHERE f.FileSet = ?) ORDER BY StartTime DESC LIMIT 1",
 		LastSuccessfulJob:     "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId IN(SELECT f.FileSetId FROM FileSet f WHERE f.FileSet = ?) AND JobStatus IN('T', 'W') ORDER BY StartTime DESC LIMIT 1",
 		LastSuccessfulFullJob: "SELECT JobStatus,JobBytes,JobFiles,JobErrors,StartTime,COALESCE(EndTime, NOW()) FROM Job WHERE Name = ? AND ClientId = ? AND FileSetId IN(SELECT f.FileSetId FROM FileSet f WHERE f.FileSet = ?) AND JobStatus IN('T', 'W') AND Level = 'F' ORDER BY StartTime DESC LIMIT 1",
-		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, (not exists(select * from JobMedia jm where jm.mediaid = m.mediaid)) AS prunable, COALESCE(TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW(), false) AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
+		PoolInfo:              "SELECT p.name, sum(m.volbytes) AS bytes, count(*) AS volumes, CASE when m.mediaid not in (select distinct MediaId from JobMedia) then 1 ELSE 0 END AS prunable, COALESCE(TIMESTAMPADD(SECOND, m.volretention, m.lastwritten) < NOW(), false) AS expired FROM Media m LEFT JOIN Pool p ON m.poolid = p.poolid GROUP BY p.name, prunable, expired",
 		JobStates:             "SELECT JobStatus FROM Status",
 	},
 	"postgres": &sqlQueries{
