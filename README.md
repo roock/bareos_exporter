@@ -27,15 +27,15 @@ docker run --name bareos_exporter -p 9625:9625 -d vierbergenlars/bareos_exporter
 
 ### Default variables
 
-`DB_TYPE` postgres
-`DB_HOST` localhost
-`DB_PORT` 5432 (postgres)
-`DB_USER` bareos
-`DB_NAME` bareos
-`SSL_MODE` disable
-`ENDPOINT` /metrics
-`JOB_DAYS` 7
-`WAIT_FOR_DB` 0
+* `DB_TYPE` postgres
+* `DB_HOST` localhost
+* `DB_PORT` 5432 (postgres)
+* `DB_USER` bareos
+* `DB_NAME` bareos
+* `SSL_MODE` disable
+* `ENDPOINT` /metrics
+* `JOB_DAYS` 7
+* `WAIT_FOR_DB` 0
 
 ## Metrics
 
