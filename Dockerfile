@@ -29,3 +29,4 @@ ENV WAIT_FOR_DB 0
 
 EXPOSE $PORT
 ENTRYPOINT ["/entrypoint.sh"]
+CMD ["./bareos_exporter"]
