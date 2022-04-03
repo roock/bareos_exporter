@@ -35,6 +35,12 @@ Default variables:
 docker run --name bareos_exporter -p 9625:9625 -d vierbergenlars/bareos_exporter:latest -dsn 'mysql://login:password@tcp(host:port)/dbname?parseTime=true'
 ```
 
+### Troubleshooting
+
+```bash
+docker run --name bareos_exporter -t -i --rm --entrypoint=/bin/sh vierbergenlars/bareos_exporter:latest
+```
+
 ## Metrics
 
 ### Aggregated metrics for all jobs
