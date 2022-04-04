@@ -5,7 +5,7 @@
 
 ## [`Dockerfile`](./Dockerfile)
 
-## Usage with [docker](https://hub.docker.com/r/vierbergenlnars/bareos_exporter)
+## Usage with [docker](https://hub.docker.com/r/vierbergenlars/bareos_exporter)
 
 1. Create a .env file containing at least your database password using `DB_PASSWORD` variable.
 2. Run docker image as follows
