@@ -6,12 +6,41 @@
 ## [`Dockerfile`](./Dockerfile)
 
 ## Usage with [docker](https://hub.docker.com/r/vierbergenlnars/bareos_exporter)
-1. Create a file containing your mysql password and mount it inside `/bareos_exporter/pw/auth`
-2. **(optional)** [Overwrite](https://docs.docker.com/engine/reference/run/#env-environment-variables) default args using ENV variables
-3. Run docker image as follows
+
+1. Create a .env file containing at least your database password using `DB_PASSWORD` variable.
+2. Run docker image as follows
+
+### Using environment variables
+
 ```bash
-docker run --name bareos_exporter -p 9625:9625 -d vierbergenlars/bareos_exporter:latest -dsn mysql://user:password@host/dbname
+docker run --name bareos_exporter -p 9625:9625 -e DB_TYPE=mysql -e DB_NAME=bareos-dir -d vierbergenlars/bareos_exporter:latest
 ```
+
+Default variables:
+
+* `PORT` 9625 (exporter)
+* `DB_TYPE` postgres
+* `DB_HOST` localhost
+* `DB_PORT` 5432 (postgres)
+* `DB_USER` bareos
+* `DB_NAME` bareos
+* `SSL_MODE` disable (postgres only)
+* `ENDPOINT` /metrics
+* `JOB_DAYS` 7
+* `WAIT_FOR_DB` 0
+
+### Using custom Docker CMD
+
+```bash
+docker run --name bareos_exporter -p 9625:9625 -d vierbergenlars/bareos_exporter:latest -dsn 'mysql://login:password@tcp(host:port)/dbname?parseTime=true'
+```
+
+### Troubleshooting
+
+```bash
+docker run --name bareos_exporter -t -i --rm --entrypoint=/bin/sh vierbergenlars/bareos_exporter:latest
+```
+
 ## Metrics
 
 ### Aggregated metrics for all jobs
