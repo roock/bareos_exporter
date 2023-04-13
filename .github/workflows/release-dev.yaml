@@ -21,7 +21,7 @@ jobs:
       uses: mknejp/delete-release-assets@36f2f2d2982eacea19cfc67bf2644afe636dd8b4
       with:
         token: ${{ github.token }}
-        tag: dev
+        tag: dev-build
         fail-if-no-assets: false
         assets: |
           bareos_exporter-*
