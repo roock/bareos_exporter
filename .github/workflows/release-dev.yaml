@@ -21,7 +21,7 @@ jobs:
       uses: mknejp/delete-release-assets@36f2f2d2982eacea19cfc67bf2644afe636dd8b4
       with:
         token: ${{ github.token }}
-        tag: dev-build
+        tag: latest
         fail-if-no-assets: false
         assets: |
           bareos_exporter-*
@@ -47,6 +47,6 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
-        release_tag: dev
+        release_tag: latest
         overwrite: true
         asset_name: "${BINARY_NAME}-${{ env.BUILD_TIME }}-${RELEASE_TAG}-${GOOS}-${GOARCH}"
