@@ -8,6 +8,8 @@ on:
 jobs:
   releases-matrix:
     name: Release Go Binary
+    permissions:
+      contents: write # for wangyoucao577/go-release-action to upload release assetsi
     runs-on: ubuntu-latest
     strategy:
       matrix:
