@@ -1,25 +1,24 @@
----
 name: Build release binaries
 on:
   release:
     types:
-      - published
+    - published
+    - edited
+  workflow_dispatch:
 jobs:
   releases-matrix:
     name: Release Go Binary
+    permissions:
+      contents: write # for wangyoucao577/go-release-action to upload release assetsi
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # build and publish in parallel: linux/386, linux/amd64, windows/386, windows/amd64, darwin/amd64
-        goos: [linux, windows, darwin]
-        goarch: ["386", amd64]
-        exclude:
-          - goarch: "386"
-            goos: darwin
+        goos: [linux, windows]
+        goarch: [amd64]
     steps:
     - uses: actions/checkout@v2
     - name: compile and release
-      uses: wangyoucao577/go-release-action@v1.17
+      uses: wangyoucao577/go-release-action@v1.37
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
