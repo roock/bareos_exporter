@@ -1,6 +1,6 @@
 # bareos_exporter
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/b1-systems/bareos_exporter)](https://goreportcard.com/report/github.com/b1-systems/bareos_exporter)
+[![Go Report Card](https://goreportcard.com/badge/github.com/roock/bareos_exporter)](https://goreportcard.com/report/github.com/roock/bareos_exporter)
 
 [Prometheus](https://github.com/prometheus) exporter for [bareos](https://github.com/bareos) data recovery system
 
@@ -13,7 +13,7 @@
 3. Run docker image as follows
 
 ```bash
-docker run --name bareos_exporter -p 9625:9625 -d b1-systems/bareos_exporter:latest -dbtype mysql -dsn mysql://user:password@host/dbname
+docker run --name bareos_exporter -p 9625:9625 -d ghcr.io/roock/bareos_exporter:latest -dbtype mysql -dsn mysql://user:password@host/dbname
 ```
 
 ## Metrics

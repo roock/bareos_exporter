@@ -1,4 +1,4 @@
--- Reproduction of https://github.com/vierbergenlars/bareos_exporter/issues/9
+-- Reproduction of https://github.com/roock/bareos_exporter/issues/9
 
 INSERT INTO public.media (volumename, mediatype, firstwritten, lastwritten, labeldate, volstatus, poolid)
     VALUES

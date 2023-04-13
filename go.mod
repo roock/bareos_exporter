@@ -1,4 +1,4 @@
-module github.com/vierbergenlars/bareos_exporter
+module github.com/roock/bareos_exporter
 
 go 1.17
 

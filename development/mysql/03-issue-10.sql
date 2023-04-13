@@ -1,4 +1,4 @@
--- Reproduction of https://github.com/vierbergenlars/bareos_exporter/issues/10
+-- Reproduction of https://github.com/roock/bareos_exporter/issues/10
 
 INSERT INTO FileSet (fileset, md5, createtime, filesettext)
     VALUES
