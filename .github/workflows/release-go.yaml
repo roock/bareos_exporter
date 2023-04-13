@@ -1,10 +1,9 @@
----
 name: Build release binaries
 on:
   release:
     types:
-      - published
-      - edited
+    - published
+    - edited
   workflow_dispatch:
 jobs:
   releases-matrix:
@@ -17,7 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: compile and release
-      uses: wangyoucao577/go-release-action@v1.22
+      uses: wangyoucao577/go-release-action@v1.37
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
