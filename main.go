@@ -26,6 +26,7 @@ func main() {
 	flag.Parse()
 
 	connection, err := GetConnection(*databaseType, *databaseURL, *jobDiscoveryDays)
+
 	if err != nil {
 		log.Fatal(err)
 	}
