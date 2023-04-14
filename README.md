@@ -1,5 +1,8 @@
 # bareos_exporter
 
+[![Lint Status](https://github.com/roock/bareos_exporter/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/roock/bareos_exporter/actions/workflows/golangci-lint.yml)
+[![Container Build Status](https://github.com/roock/bareos_exporter/actions/workflows/publish-docker.yaml/badge.svg)](https://github.com/roock/bareos_exporter/actions/workflows/publish-docker.yaml)
+[![Release Build Status](https://github.com/roock/bareos_exporter/actions/workflows/release-dev.yaml/badge.svg)](https://github.com/roock/bareos_exporter/actions/workflows/release-dev.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/roock/bareos_exporter)](https://goreportcard.com/report/github.com/roock/bareos_exporter)
 
 [Prometheus](https://github.com/prometheus) exporter for [bareos](https://github.com/bareos) data recovery system
