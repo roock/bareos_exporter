@@ -4,22 +4,6 @@ import "time"
 
 type JobType string
 
-const (
-	BackupJob      JobType = "B"
-	MigratedJob            = "J"
-	VerifyJob              = "V"
-	RestoreJob             = "R"
-	ConsoleJob             = "U"
-	SystemJob              = "I"
-	AdminJob               = "D"
-	ArchiveJob             = "A"
-	JobCopyJob             = "C"
-	CopyJob                = "c"
-	MigrateJob             = "J"
-	ScanJob                = "S"
-	ConsolidateJob         = "O"
-)
-
 type JobLookup struct {
 	JobName     string
 	clientId    int
