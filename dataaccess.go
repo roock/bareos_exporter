@@ -245,15 +245,6 @@ func hasState(lst []poolInfoState, itm poolInfoState) bool {
 	return false
 }
 
-func hasItem(lst []string, itm string) bool {
-	for _, i := range lst {
-		if i == itm {
-			return true
-		}
-	}
-	return false
-}
-
 // Close the database connection
 func (connection Connection) Close() error {
 	return connection.db.Close()
