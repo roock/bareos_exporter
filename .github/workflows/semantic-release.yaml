@@ -1,4 +1,4 @@
-name: Release
+name: Semantic Release
 
 on:
   push:
@@ -18,7 +18,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      # https://github.com/semantic-release/semantic-release
+      # https://github.com/cycjimmy/semantic-release-action
+      # Semantic Release dry run:
+      # https://github.com/traefik/faency/pull/309
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          semantic_version: 19
+          ci: true
+          dry_run: false
+          # You can specify specifying version range for the extra plugins if you prefer.
+          extra_plugins: |
+            @semantic-release/changelog@6.0.0
+            @semantic-release/git
