@@ -35,8 +35,10 @@ jobs:
       - uses: ahmadnassri/action-commit-lint@v2.1.4
 
   label:
-    runs-on: ubuntu-latest
     name: Label PR derived from the conventional commit messages
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: label
         # https://github.com/action-runner/conventional-labeler
